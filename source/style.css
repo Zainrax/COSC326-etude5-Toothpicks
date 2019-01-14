@@ -1,0 +1,51 @@
+html{
+    font-family: Helvetica, Arial, sans-serif;
+}
+
+#add{
+    background-color: #3c79ec;
+    color:white;
+}
+
+#remove{
+    background-color: #e06767;
+    color:white;
+}
+
+.menu:hover{
+    cursor: pointer;
+}
+
+.top-subcontainer{
+    display: inline-flex;
+    align-items: center
+}
+
+.top-subcontainer > input{
+    width: 50px;
+}
+.top-title{
+    font-size: 1icem;
+    margin: 0;
+}
+
+.container{
+    display: grid;
+    grid-template-columns: 1fr;
+    grid-template-rows: 8vh 92vh;
+}
+
+.top-bar{
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 40px 0 40px;
+    box-shadow: 0px 2px 4px rgba(0,0,0,0.18)
+}
+
+.button{
+    cursor: pointer;
+    user-select: none; 
+    padding: 10px;
+}
+
