@@ -1,0 +1,24 @@
+{
+  "name": "cosc326-etude5-toothpicks",
+  "version": "1.0.0",
+  "description": "Toothpick problem",
+  "main": "drawpick.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Zainrax/COSC326-etude5-Toothpicks.git"
+  },
+  "author": "Patrick Baxter",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/Zainrax/COSC326-etude5-Toothpicks/issues"
+  },
+  "homepage": "https://github.com/Zainrax/COSC326-etude5-Toothpicks#readme",
+  "devDependencies": {
+    "eslint": "^5.12.0",
+    "eslint-config-airbnb-base": "^13.1.0",
+    "eslint-plugin-import": "^2.14.0"
+  }
+}
