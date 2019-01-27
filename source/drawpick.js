@@ -1,41 +1,26 @@
 const parent = document.getElementById("canvas-parent")
 const canvas = document.getElementById("canvas")
+const generation = document.getElementById("generation")
+const ratio = document.getElementById("ratio")
 
-function resizeCanvas(){
-    
-}
-
-window.onload = () =>{
-    canvas.width  = parent.offsetWidth
-    canvas.height = parent.offsetHeight
-    mainCanvas = new Toothpicks(canvas,10,1)
-    mainCanvas.calcLines()
-    mainCanvas.drawLines()
-}
-
-window.onresize = () =>{
-    resizeCanvas()
-}
-
-class Toothpicks{
-    constructor(canvas,g,r){
+class Toothpicks {
+    constructor(canvas, g, r) {
         this.canvas = canvas
         this.generation = g
         this.ratio = r
-        this.length = 20
-        this.cwidth = canvas.width/2
-        this.cheight = canvas.height/2
-        this.lines = new Float32Array(8*(2**this.generation)-4)
+        this.length = 0.5
+        this.lines = new Float32Array(8 * (2 ** this.generation) - 4)
     }
 
-    calcLines(){
+    calcLines() {
         let x = 0
         let y = 0
-        this.lines[0] = this.cwidth - this.length
-        this.lines[1] = this.cheight
-        this.lines[2] = this.cwidth + this.length
-        this.lines[3] = this.cheight
-        
+        this.calcLength()
+        this.lines[0] = 0 - this.length
+        this.lines[1] = 0
+        this.lines[2] = 0 + this.length
+        this.lines[3] = 0
+
         let total = 2
         let index = 0
         let currIndex = 4
@@ -44,12 +29,12 @@ class Toothpicks{
             this.length *= this.ratio
             for (let j = 0; j < total; j++) {
                 x = this.lines[index]
-                y = this.lines[index+1]
+                y = this.lines[index + 1]
                 index += 2
-                if(orientation){
-                    this.lines.set([x,y - this.length ,x ,y + this.length], currIndex)
-                } else{
-                    this.lines.set([x - this.length,y,x + this.length,y],currIndex)
+                if (orientation) {
+                    this.lines.set([x, y - this.length, x, y + this.length], currIndex)
+                } else {
+                    this.lines.set([x - this.length, y, x + this.length, y], currIndex)
                 }
                 currIndex += 4
             }
@@ -58,85 +43,181 @@ class Toothpicks{
         }
     }
 
-    drawLines(){
-        const gl = canvas.getContext("webgl")
-        if(!gl){
-            return
+    calcLength() {
+        if (this.ratio == 1 && this.generation > 2) {
+            this.length = 1.3 / (this.generation)
+        } else if (this.ratio > 1 && this.generation > 0) {
+            this.length = 0.73 / (this.ratio ** this.generation)
+        } else if (this.ratio < 1 && this.generation > 2) {
+            this.length = 0.5 - ((1 * this.ratio) / 2 / (this.generation / 2))
         }
-        let program = webglUtils.createProgramFromScripts(gl,["2d-vertex-shader","2d-fragment-shader"])
-        gl.useProgram(program);
-        let positionAttributeLocation = gl.getAttribLocation(program, "a_position")
 
-        let colorLocation = gl.getUniformLocation(program, "u_color")
-        let matrixLocation = gl.getUniformLocation(program, "u_matrix")
-
-        let positionBuffer = gl.createBuffer()
-        gl.bindBuffer(gl.ARRAY_BUFFER,positionBuffer)
-
-        gl.viewport(0, 0, gl.canvas.width, gl.canvas.height)
-        gl.enableVertexAttribArray(positionAttributeLocation);
-        gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
-
-        var size = 2;          // 2 components per iteration
-        var type = gl.FLOAT;   // the data is 32bit floats
-        var normalize = false; // don't normalize the data
-        var stride = 0;        // 0 = move forward size * sizeof(type) each iteration to get the next position
-        var offset = 0;        // start at the beginning of the buffer
-        gl.vertexAttribPointer(
-        positionAttributeLocation, size, type, normalize, stride, offset)
-        
-        gl.bufferData( gl.ARRAY_BUFFER,this.lines,gl.STATIC_DRAW)
-
-        var primitiveType = gl.LINES;
-        var offset = 0;
-        var count = 2;
-        gl.drawArrays(primitiveType, offset, count);
     }
 
-    print(){
+    drawLines() {
+        this.gl = canvas.getContext("webgl")
+        if (!this.gl) {
+            alert('Does not support webgl')
+            return
+        }
+
+        const vsSource = `
+            attribute vec2 aVertexPosition;
+
+
+            void main() {
+                gl_Position = vec4(aVertexPosition.xy,0,1);
+            }
+        `
+        const fsSource = `
+
+            precision highp float;
+
+            void main() {
+            gl_FragColor = vec4(0, 0, 0, 1.0);
+            }
+        `
+
+        const vertexShader = createShader(this.gl, this.gl.VERTEX_SHADER, vsSource)
+        const fragmentShader = createShader(this.gl, this.gl.FRAGMENT_SHADER, fsSource)
+
+        const shaderProgram = createProgram(this.gl, vertexShader, fragmentShader)
+
+        // Collect all the info needed to use the shader program.
+        // Look up which attribute our shader program is using
+        // for aVertexPosition and look up uniform locations.
+        this.programInfo = {
+            program: shaderProgram,
+            attribLocations: {
+                vertexPosition: this.gl.getAttribLocation(shaderProgram, 'aVertexPosition'),
+            }
+        }
+
+        // Here's where we call the routine that builds all the
+        // objects we'll be drawing.
+        this.buffers = initBuffers(this.gl, this.lines)
+
+
+        // Here's where we call the routine that builds all the
+        // objects we'll be drawing.
+
+
+        // Draw the scene
+        this.drawScene()
+    }
+
+    drawScene() {
+        resize(canvas)
+        this.gl.clearColor(0.0, 0.0, 0.0, 0.0)
+        this.gl.clear(this.gl.COLOR_BUFFER_BIT)
+        this.gl.viewport(0, 0, this.gl.canvas.width, this.gl.canvas.height)
+
+        const components = 2
+        const type = this.gl.FLOAT
+        const normalize = false
+        const stride = 0
+        const offset = 0
+        this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.buffers.position)
+        this.gl.vertexAttribPointer(
+            this.programInfo.attribLocations.vertexPosition,
+            components,
+            type,
+            normalize,
+            stride,
+            offset)
+        this.gl.enableVertexAttribArray(
+            this.programInfo.attribLocations.vertexPosition)
+
+        this.gl.useProgram(this.programInfo.program)
+
+        this.gl.drawArrays(this.gl.LINES, 0, this.lines.length / 2)
+    }
+
+    print() {
         console.log(this.lines)
-        
     }
 }
 
-function createShader(gl, type, source) {
-    let shader = gl.createShader(type);
-    gl.shaderSource(shader, source);
-    gl.compileShader(shader);
-    let success = gl.getShaderParameter(shader, gl.COMPILE_STATUS);
-    if (success) {
-      return shader;
+let mainCanvas = new Toothpicks(canvas, 0, 1)
+let currGen = 0
+let currRatio = 1
+
+window.onload = () => {
+    resize(canvas)
+    mainCanvas.calcLines()
+    mainCanvas.drawLines()
+}
+
+window.onresize = () => {
+    resize(canvas)
+}
+
+
+const confirmGen = () => {
+    if (generation.value != currGen | ratio.value != currRatio) {
+        mainCanvas = new Toothpicks(canvas, generation.value, ratio.value)
+        mainCanvas.calcLines()
+        mainCanvas.drawLines()
     }
-   
-    console.log(gl.getShaderInfoLog(shader));
-    gl.deleteShader(shader);
-  }
+    currGen = generation.value
+    currRatio = ratio.value
+}
+
+const resetGeneration = () => {
+    generation.value = 0
+    ratio.value = 1
+    mainCanvas = new Toothpicks(canvas, 0, 1)
+    confirmGen()
+}
+
+function initBuffers(gl, arr) {
+    const positionBuffer = gl.createBuffer()
+    gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer)
+    gl.bufferData(gl.ARRAY_BUFFER, arr, gl.STATIC_DRAW)
+
+    return { position: positionBuffer }
+}
+
+
+function createShader(gl, type, source) {
+    const shader = gl.createShader(type)
+    gl.shaderSource(shader, source)
+    gl.compileShader(shader)
+    const success = gl.getShaderParameter(shader, gl.COMPILE_STATUS)
+    if (!success) {
+        console.log(gl.getShaderInfoLog(shader))
+        gl.deleteShader(shader)
+        return
+    }
+    return shader
+}
 
 function createProgram(gl, vertexShader, fragmentShader) {
-    let program = gl.createProgram();
-    gl.attachShader(program, vertexShader);
-    gl.attachShader(program, fragmentShader);
-    gl.linkProgram(program);
-    var success = gl.getProgramParameter(program, gl.LINK_STATUS);
-    if (success) {
-      return program;
+    var program = gl.createProgram()
+    gl.attachShader(program, vertexShader)
+    gl.attachShader(program, fragmentShader)
+    gl.linkProgram(program)
+    var success = gl.getProgramParameter(program, gl.LINK_STATUS)
+    if (!success) {
+        console.log(gl.getProgramInfoLog(program))
+        gl.deleteProgram(program)
+        return
     }
-   
-    console.log(gl.getProgramInfoLog(program));
-    gl.deleteProgram(program);
-  }
+    return program
+}
 
-  function resize(canvas) {
-    // Lookup the size the browser is displaying the canvas.
-    var displayWidth  = canvas.clientWidth;
-    var displayHeight = canvas.clientHeight;
+function resize(canvas) {
+    const displayWidth = parent.offsetWidth
+    const displayHeight = parent.offsetHeight
+    let display = displayHeight
 
-    // Check if the canvas is not the same size.
-    if (canvas.width  !== displayWidth ||
-        canvas.height !== displayHeight) {
-
-      // Make the canvas the same size
-      canvas.width  = displayWidth;
-      canvas.height = displayHeight;
+    if (displayWidth < displayHeight) {
+        display = displayWidth
     }
-  }
+
+    if (canvas.width != display || canvas.height != display) {
+        canvas.width = display
+        canvas.height = display
+    }
+}
+
